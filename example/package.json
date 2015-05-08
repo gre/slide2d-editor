@@ -1,0 +1,19 @@
+{
+  "name": "slide2d-editor-example",
+  "version": "1.0.0",
+  "main": "index.js",
+  "browserify": {
+    "transform": [
+      "babelify"
+    ]
+  },
+  "scripts": {
+    "start": "budo index.js:build.js --live -d | garnish"
+  },
+  "dependencies": {
+    "babelify": "^6.0.2",
+    "budo": "^4.0.0",
+    "garnish": "^2.1.3",
+    "watchify": "^3.2.1"
+  }
+}

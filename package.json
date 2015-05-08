@@ -1,0 +1,40 @@
+{
+  "name": "slide2d-editor",
+  "version": "0.0.1",
+  "description": "A WYSIWYG editor for slide2d",
+  "main": "src/index.js",
+  "browserify": {
+    "transform": [
+      "babelify"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gre/slide2d-editor"
+  },
+  "keywords": [
+    "slide2d",
+    "wysiwyg",
+    "slideshow",
+    "slide"
+  ],
+  "author": "Gaëtan Renaudeau",
+  "license": "GPLv3",
+  "bugs": {
+    "url": "https://github.com/gre/slide2d-editor/issues"
+  },
+  "homepage": "https://github.com/gre/slide2d-editor",
+  "peerDependencies": {
+    "react": "*"
+  },
+  "dependencies": {
+    "color": "^0.8.0",
+    "lodash": "^3.8.0",
+    "object-assign": "^2.0.0",
+    "slide2d": "^1.0.2",
+    "uncontrollable": "^1.1.4"
+  },
+  "devDependencies": {
+    "babelify": "^6.0.2"
+  }
+}
