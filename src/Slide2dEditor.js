@@ -117,7 +117,7 @@ class ToolbarFontSize extends React.Component {
       color: "#000",
       background: "#fff",
     };
-    return <input style={style} type="number" min="4" max="100" step="1" value={value} onChange={this.onChange} />;
+    return <input style={style} type="number" min="4" max="99" step="1" value={value} onChange={this.onChange} />;
   }
 }
 

@@ -10,7 +10,44 @@ const initialValue = {
   ]
 };
 
-React.render(<Slide2dEditor
-  width={800}
-  height={440}
-  defaultValue={initialValue} />, document.body);
+class App extends React.Component {
+  constructor (props) {
+    super(props);
+    this.onChange = this.onChange.bind(this);
+    this.onEdit = this.onEdit.bind(this);
+    this.state = {
+      value: initialValue
+    };
+  }
+  onChange (value) {
+    this.setState({ value });
+  }
+  onEdit (e) {
+    try {
+      this.onChange(JSON.parse(e.target.value));
+    }
+    catch (err) {
+      console.error(err);
+    }
+  }
+  render () {
+    const { value } = this.state;
+    return <div>
+      <div>
+      <Slide2dEditor
+        width={800}
+        height={440}
+        value={value}
+        onChange={this.onChange} />
+      </div>
+      <div>
+      <textarea
+        style={{ width: "800px", height: "400px", fontFamily: "monospace" }}
+        onChange={this.onEdit}
+        value={JSON.stringify(value, null, 2)} />
+      </div>
+    </div>;
+  }
+}
+
+React.render(<App />, document.body);
