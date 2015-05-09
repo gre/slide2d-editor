@@ -19,9 +19,9 @@ function shapeOperation (op) {
   }
 }
 
-function initialShapeForItem (/*item, data*/) {
+function initialShapeForItem () {
   return [
-    { fillStyle: "#000", font: "normal 40px Arial" },
+    {},
     [ "fillText", "Text", 10, 10, 40 ]
   ];
 }
@@ -615,12 +615,21 @@ export default class Slide2dEditor extends React.Component {
     } = this.props;
     let copy = clone(value);
     copy.draws = clone(copy.draws);
-    copy.draws[index-1] = styles;
     const target = copy.draws[index] = clone(copy.draws[index]);
     if (shapeOperation(target) === Shapes.TEXT) {
       target[4] = deserializeFont(styles.font).size;
     }
-    // TODO: we need to apply styles simplification pass.
+
+    // Keep the styles that are new in the context
+    const stylesContext = core.getCanvasStyles(copy, index-1);
+    const newStyles = {};
+    for (let k in styles) {
+      if (stylesContext[k] !== styles[k]) {
+        newStyles[k] = styles[k];
+      }
+    }
+    copy.draws[index-1] = newStyles;
+
     onChange(copy);
   }
 
