@@ -4,6 +4,7 @@ import cloneDeep from "lodash/lang/cloneDeep";
 import clone from "lodash/lang/clone";
 import Slide2d from "slide2d";
 import objectAssign from "object-assign";
+import Slide2dMeta from "./Slide2dMeta";
 import * as core from "./core";
 import * as vec2 from "./vec2";
 
@@ -53,6 +54,58 @@ class ToolbarGroup extends React.Component {
       float: float || "none"
     };
     return <div style={style}>{children}</div>;
+  }
+}
+
+class ToolbarButton extends React.Component {
+  constructor (props) {
+    super(props);
+    this.onClick = this.onClick.bind(this);
+    this.onHoverEnter = this.onHoverEnter.bind(this);
+    this.onHoverLeave = this.onHoverLeave.bind(this);
+    this.state = {
+      hover: false
+    };
+  }
+  onHoverEnter () {
+    this.setState({
+      hover: true
+    });
+  }
+  onHoverLeave () {
+    this.setState({
+      hover: false
+    });
+  }
+  onClick (e) {
+    const { onChange, disabled } = this.props;
+    e.preventDefault();
+    if (!disabled && onChange) onChange();
+  }
+  render () {
+    const {
+      hover
+    } = this.state;
+    const {
+      icon,
+      title,
+      disabled
+    } = this.props;
+    const style = {
+      verticalAlign: "top",
+      fontSize: "24px",
+      padding: "8px",
+      color: disabled ? "#ccc" : "#000",
+      background: disabled ? "#eee" : (hover ? "#fff" : "#eee")
+    };
+    return <i
+      title={title}
+      className={"fa fa-"+icon}
+      style={style}
+      onClick={this.onClick}
+      onMouseEnter={this.onHoverEnter}
+      onMouseLeave={this.onHoverLeave}
+    ></i>;
   }
 }
 
@@ -166,7 +219,7 @@ class ToolbarSize extends React.Component {
     super(props);
     this.onChange = this.onChange.bind(this);
   }
-  onChange (e) {
+  onChange () {
     const vals = [0,1].map(function (i) {
       return React.findDOMNode(this.refs[i]).value;
     }, this);
@@ -347,16 +400,22 @@ class MainToolbar extends React.Component {
       createItem
     } = this.props;
     return <div>
-      <ToolbarToggleButton
+      <ToolbarButton
         title="new Text"
         icon="font"
-        active={false}
         onChange={createItem.bind(null, Shapes.TEXT)} />
-      <ToolbarToggleButton
+      <ToolbarButton
         title="new Rectangle"
-        icon="square"
-        active={false}
+        icon="square-o"
         onChange={createItem.bind(null, Shapes.RECT)} />
+      <ToolbarButton
+        icon="circle-o"
+        disabled={true}
+        onChange={createItem.bind(null, Shapes.CIRCLE)} />
+      <ToolbarButton
+        icon="picture-o"
+        disabled={true}
+        onChange={createItem.bind(null, Shapes.PICTURE)} />
       <ToolbarGroup float="right">
         <ToolbarColor
           value={data.background}
@@ -377,6 +436,7 @@ class Toolbar extends React.Component {
       width,
       edit,
       data,
+      meta,
       createItem,
       alterStyle,
       alterData,
@@ -404,7 +464,7 @@ class Toolbar extends React.Component {
         <T
           draw={draw}
           onDrawChange={alterDraw.bind(null, edit)}
-          styles={core.getCanvasStyles(data, edit)}
+          styles={meta.getMeta([ edit ]).styles}
           onStylesChange={alterStyle.bind(null, edit)} />;
     }
 
@@ -427,7 +487,7 @@ class Viewport extends React.Component {
       width,
       height
     } = this.props;
-    const dpr = 1;//window.devicePixelRatio || 1;
+    const dpr = window.devicePixelRatio || 1;
     const fullWidth = width * dpr;
     const fullHeight = height * dpr;
     const style = {
@@ -473,8 +533,7 @@ class TextEditor extends React.Component {
     const {
       value,
       styles,
-      bound,
-      scale
+      bound
     } = this.props;
     const style = objectAssign(
       this.fromCanvasStyles(styles, value[4]), {
@@ -487,7 +546,7 @@ class TextEditor extends React.Component {
         left: 0,
         width: Math.max(10, Math.round(bound[2]))+"px",
         height: Math.round(bound[3])+"px",
-        transform: "scale("+scale+") translate("+bound[0]+"px,"+bound[1]+"px)",
+        transform: "translate("+bound[0]+"px,"+bound[1]+"px)",
         overflow: "hidden",
         resize: "none"
     });
@@ -498,8 +557,7 @@ class TextEditor extends React.Component {
 class RectEditor extends React.Component {
   render () {
     const {
-      value,
-      styles
+      value
     } = this.props;
     const style = objectAssign(
       core.boundStyle(value.slice(1)), {
@@ -529,17 +587,19 @@ class ViewportEditor extends React.Component {
     ];
   }
   onMouseDown (e) {
+    const meta = this.props.meta;
     const isTextArea = e.target.nodeName === "TEXTAREA";
     if (!isTextArea)
       e.preventDefault();
-    const slide2d = this.refs.viewport && this.refs.viewport.slide2d;
     const data = cloneDeep(this.props.data);
     const pos = this.positionForEvent(e);
-    const target = core.findItemByPosition(slide2d, data, pos);
+    const t = meta.findByPosition(pos);
+    const target = t ? t[0] : -1; // FIXME
     const down = { target, data, pos, isTextArea };
     this.setState({ down, hover: null });
   }
   onMouseMove (e) {
+    const meta = this.props.meta;
     const down = this.state.down;
     const pos = this.positionForEvent(e);
     if (down && down.target!==-1) {
@@ -555,8 +615,8 @@ class ViewportEditor extends React.Component {
       }
     }
     if (!down) {
-      const slide2d = this.refs.viewport && this.refs.viewport.slide2d;
-      const target = core.findItemByPosition(slide2d, this.props.data, pos);
+      const t = meta.findByPosition(pos);
+      const target = t ? t[0] : -1; // FIXME
       const hover = {
         target: target
       };
@@ -591,12 +651,14 @@ class ViewportEditor extends React.Component {
       height,
       data,
       edit,
-      alterDraw
+      alterDraw,
+      meta
     } = this.props;
     const {
       down,
       hover
     } = this.state;
+
     const style = {
       position: "relative",
       display: "inline-block",
@@ -622,14 +684,11 @@ class ViewportEditor extends React.Component {
     const renderDraws = renderData.draws = clone(renderData.draws);
 
     let content;
-    const slide2d = this.refs.viewport && this.refs.viewport.slide2d;
 
     if (edit !== -1) {
       const object = data.draws[edit];
-      const styles = core.getCanvasStyles(data, edit);
-      let bound = core.computeBound(slide2d, object, styles);
-      const P = core.Position(slide2d, data);
-      const scale = P.getScale();
+      let m = meta.getMeta([ edit ]);
+
       switch (shapeOperation(object)) {
         case Shapes.TEXT:
         // Text should disappear when edited
@@ -638,21 +697,20 @@ class ViewportEditor extends React.Component {
         content = <TextEditor
           value={object}
           onChange={alterDraw.bind(null, edit)}
-          bound={P.applyBound(bound)}
-          scale={scale}
-          styles={styles} />;
+          bound={m.bound}
+          styles={m.styles} />;
         break;
 
         case Shapes.RECT:
         content = <RectEditor
           value={object}
-          styles={styles} />;
+          styles={m.styles} />;
       }
     }
 
     if (down && down.target !== -1 && (!down.isTextArea || down.hasLeavedTextArea)) {
       let {target} = down;
-      let bound = core.computeBound(slide2d, data.draws[target], core.getCanvasStyles(data, target));
+      let { bound } = meta.getMeta([ target ]);
       renderDraws.push({
         fillStyle: "rgba(255,0,0,0.2)",
         strokeStyle: "rgba(255,0,0,1)",
@@ -664,7 +722,7 @@ class ViewportEditor extends React.Component {
 
     if (hover && hover.target !== -1 && (edit === -1 || edit !== hover.target)) {
       let {target} = hover;
-      let bound = core.computeBound(slide2d, data.draws[target], core.getCanvasStyles(data, target));
+      let { bound } = meta.getMeta([ target ]);
       renderDraws.push({
         fillStyle: "transparent",
         strokeStyle: "rgba(255,0,0,1)",
@@ -677,7 +735,7 @@ class ViewportEditor extends React.Component {
     }
 
     return <div {...mouseEvents} style={style}>
-      <Viewport ref="viewport" width={width} height={height} data={renderData} />
+      <Viewport width={width} height={height} data={renderData} />
       <div style={contentStyle}>
         {content}
       </div>
@@ -697,6 +755,15 @@ export default class Slide2dEditor extends React.Component {
     this.alterDraw = this.alterDraw.bind(this);
     this.createItem = this.createItem.bind(this);
     this.alterData = this.alterData.bind(this);
+
+    this.meta = new Slide2dMeta(props.width, props.height-toolbarHeight, props.value);
+  }
+  componentWillUpdate (props) {
+    if (
+      this.meta.width !== props.width ||
+      this.meta.height !== props.height ||
+      this.meta.data !== props.data)
+      this.meta = new Slide2dMeta(props.width, props.height-toolbarHeight, props.value);
   }
 
   setEdit (edit) {
@@ -771,6 +838,7 @@ export default class Slide2dEditor extends React.Component {
         {...state}
         width={width}
         data={value}
+        meta={this.meta}
         createItem={this.createItem}
         alterStyle={this.alterStyle}
         alterData={this.alterData}
@@ -780,6 +848,7 @@ export default class Slide2dEditor extends React.Component {
         width={width}
         height={height-toolbarHeight}
         data={value}
+        meta={this.meta}
         setEdit={this.setEdit}
         alterDraw={this.alterDraw} />
     </div>;
