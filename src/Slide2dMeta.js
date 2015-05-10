@@ -121,7 +121,7 @@ export default class Slide2dMeta {
       if ((draw instanceof Array) && typeof draw[0] === "string") {
         // post draw op
         const canvasBound = computeBound(ctx, draw);
-        const bound = transformBound(ctx, canvasBound);
+        const bound = canvasBound && transformBound(ctx, canvasBound);
 
         const styles = {};
         for (var k in ctx) {
