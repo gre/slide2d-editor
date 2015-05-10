@@ -8,7 +8,8 @@ import * as core from "./core";
 import * as vec2 from "./vec2";
 
 const Shapes = {
-  TEXT: "text"
+  TEXT: "text",
+  RECT: "rect"
 };
 
 function shapeOperation (op) {
@@ -16,14 +17,26 @@ function shapeOperation (op) {
     case "fillText":
     case "strokeText":
       return Shapes.TEXT;
+    case "rect":
+    case "fillRect":
+    case "strokeRect":
+      return Shapes.RECT;
   }
 }
 
-function initialShapeForItem () {
-  return [
-    {},
-    [ "fillText", "Text", 10, 10, 40 ]
-  ];
+function initialShapeForItem (type) {
+  switch (type) {
+    case Shapes.TEXT:
+    return [
+      {},
+      [ "fillText", "Text", 10, 10, 40 ]
+    ];
+    case Shapes.RECT:
+    return [
+      {},
+      [ "fillRect", 10, 10, 40, 40 ]
+    ]
+  }
 }
 
 const toolbarHeight = 40;
@@ -31,14 +44,13 @@ const toolbarHeight = 40;
 class ToolbarGroup extends React.Component {
   render () {
     const {
-      children
+      children,
+      float
     } = this.props;
     const style = {
-      margin: "0 2px",
-      padding: "0 2px",
-      borderLeft: "1px solid #bbb",
       display: "inline-block",
-      verticalAlign: "top"
+      verticalAlign: "top",
+      float: float || "none"
     };
     return <div style={style}>{children}</div>;
   }
@@ -149,6 +161,51 @@ class ToolbarFontFamily extends React.Component {
   }
 }
 
+class ToolbarSize extends React.Component {
+  constructor (props) {
+    super(props);
+    this.onChange = this.onChange.bind(this);
+  }
+  onChange (e) {
+    const vals = [0,1].map(function (i) {
+      return React.findDOMNode(this.refs[i]).value;
+    }, this);
+    this.props.onChange(vals);
+  }
+  render () {
+    const {
+      value
+    } = this.props;
+    const style = {
+      display: "inline-block",
+      verticalAlign: "top",
+      border: "1px solid #ccc"
+    };
+    const inputStyle = {
+      verticalAlign: "top",
+      width: "40px",
+      height: "32px",
+      lineHeight: "32px",
+      padding: "0px 2px",
+      margin: 0,
+      border: 0
+    };
+
+    const inputs = [0, 1].map(function (i) {
+      return <input
+        key={i}
+        ref={i}
+        style={inputStyle}
+        type="number"
+        value={value[i]}
+        onChange={this.onChange}
+      />;
+    }, this);
+
+    return <div style={style}>{inputs}</div>;
+  }
+}
+
 class ToolbarColor extends React.Component {
   constructor (props) {
     super(props);
@@ -205,63 +262,55 @@ class ToolbarTextAlign extends ToolbarRatio {
   }
 }
 
-function serializeFont (style) {
-  const {
-    bold,
-    italic,
-    size,
-    family
-  } = style;
-  let font = [
-    bold ? "bold" : "",
-    italic ? "italic" : "",
-    size ? size+"px" : "",
-    family
-  ].filter(function (v) {
-    return v;
-  }).join(" ");
-  return font;
-}
-function deserializeFont (font) {
-  const span = document.createElement("span");
-  span.style.font = font;
-  const {
-    fontWeight,
-    fontStyle,
-    fontSize,
-    fontFamily
-  } = span.style;
-  const extract = fontSize.match(/([0-9]+)px/);
-  return {
-    bold: fontWeight==="bold",
-    italic: fontStyle==="italic",
-    size: extract && parseInt(extract[1], 10) || 12,
-    family: fontFamily
-  };
+class RectToolbar extends React.Component {
+  setStyle (name, value) {
+    const styles = clone(this.props.styles);
+    styles[name] = value;
+    this.props.onStylesChange(styles);
+  }
+  onSizeChange (size) {
+    const draw = clone(this.props.draw);
+    draw[3] = size[0];
+    draw[4] = size[1];
+    this.props.onDrawChange(draw);
+  }
+  render () {
+    const {
+      styles,
+      draw
+    } = this.props;
+    return <div>
+      <ToolbarColor
+        value={styles.fillStyle}
+        onChange={this.setStyle.bind(this, "fillStyle")} />
+      <ToolbarGroup>
+        <ToolbarSize
+          value={draw.slice(3, 5)}
+          onChange={this.onSizeChange.bind(this)} />
+      </ToolbarGroup>
+    </div>;
+  }
 }
 
 class TextToolbar extends React.Component {
-  constructor (props) {
-    super(props);
-  }
   setFontProp (name, value) {
     const styles = clone(this.props.styles);
-    const font = deserializeFont(styles.font);
+    const font = core.deserializeFont(styles.font);
     font[name] = value;
-    styles.font = serializeFont(font);
+    styles.font = core.serializeFont(font);
     // TODO in case of size, the line-height should be in sync
-    this.props.onChange(styles);
+    this.props.onStylesChange(styles);
   }
   setStyle (name, value) {
     const styles = clone(this.props.styles);
     styles[name] = value;
-    this.props.onChange(styles);
+    this.props.onStylesChange(styles);
   }
   render () {
     const {
       styles
     } = this.props;
-    const font = deserializeFont(styles.font);
+    const font = core.deserializeFont(styles.font);
     return <div>
       <ToolbarToggleButton
         title="Bold"
@@ -303,12 +352,24 @@ class MainToolbar extends React.Component {
         icon="font"
         active={false}
         onChange={createItem.bind(null, Shapes.TEXT)} />
-      <ToolbarColor
-        value={data.background}
-        onChange={alterData.bind(null, "background")} />
+      <ToolbarToggleButton
+        title="new Rectangle"
+        icon="square"
+        active={false}
+        onChange={createItem.bind(null, Shapes.RECT)} />
+      <ToolbarGroup float="right">
+        <ToolbarColor
+          value={data.background}
+          onChange={alterData.bind(null, "background")} />
+      </ToolbarGroup>
     </div>;
   }
 }
+
+const ToolbarPerType = {
+  [Shapes.TEXT]: TextToolbar,
+  [Shapes.RECT]: RectToolbar
+};
 
 class Toolbar extends React.Component {
   render () {
@@ -318,7 +379,8 @@ class Toolbar extends React.Component {
       data,
       createItem,
       alterStyle,
-      alterData
+      alterData,
+      alterDraw
     } = this.props;
     const style = {
       display: "inline-block",
@@ -335,13 +397,15 @@ class Toolbar extends React.Component {
         createItem={createItem} />;
     }
     else {
-      let shape = shapeOperation(data.draws[edit]);
-      if (shape === Shapes.TEXT) {
-        toolbar =
-        <TextToolbar
+      let draw = data.draws[edit];
+      let shape = shapeOperation(draw);
+      let T = ToolbarPerType[shape];
+      toolbar =
+        <T
+          draw={draw}
+          onDrawChange={alterDraw.bind(null, edit)}
           styles={core.getCanvasStyles(data, edit)}
-          onChange={alterStyle.bind(null, edit)} />;
-      }
+          onStylesChange={alterStyle.bind(null, edit)} />;
     }
 
     return <div style={style}>{toolbar}</div>;
@@ -408,12 +472,12 @@ class TextEditor extends React.Component {
   render () {
     const {
       value,
-      canvasStyles,
+      styles,
       bound,
       scale
     } = this.props;
     const style = objectAssign(
-      this.fromCanvasStyles(canvasStyles, value[4]), {
+      this.fromCanvasStyles(styles, value[4]), {
         padding: 0,
         border: "none",
         outline: "1px solid red",
@@ -431,14 +495,30 @@ class TextEditor extends React.Component {
   }
 }
 
+class RectEditor extends React.Component {
+  render () {
+    const {
+      value,
+      styles
+    } = this.props;
+    const style = objectAssign(
+      core.boundStyle(value.slice(1)), {
+      outline: "2px dotted #f00"
+    });
+    return <div style={style}></div>;
+  }
+}
+
 class ViewportEditor extends React.Component {
   constructor (props) {
     super(props);
     this.onMouseDown = this.onMouseDown.bind(this);
     this.onMouseUp = this.onMouseUp.bind(this);
     this.onMouseMove = this.onMouseMove.bind(this);
+    this.onMouseLeave = this.onMouseLeave.bind(this);
     this.state = {
-      down: null
+      down: null,
+      hover: null
     };
   }
   positionForEvent (e) {
@@ -457,13 +537,13 @@ class ViewportEditor extends React.Component {
     const pos = this.positionForEvent(e);
     const target = core.findItemByPosition(slide2d, data, pos);
     const down = { target, data, pos, isTextArea };
-    this.setState({ down });
+    this.setState({ down, hover: null });
   }
   onMouseMove (e) {
     const down = this.state.down;
+    const pos = this.positionForEvent(e);
     if (down && down.target!==-1) {
       if (down.hasLeavedTextArea) {
-        const pos = this.positionForEvent(e);
         const delta = vec2.diff(pos, down.pos);
         this.props.alterDraw(down.target, core.translateDraw(down.data.draws[down.target], delta));
       }
@@ -473,6 +553,14 @@ class ViewportEditor extends React.Component {
           this.setState({ down });
         }
       }
+    }
+    if (!down) {
+      const slide2d = this.refs.viewport && this.refs.viewport.slide2d;
+      const target = core.findItemByPosition(slide2d, this.props.data, pos);
+      const hover = {
+        target: target
+      };
+      this.setState({ hover });
     }
   }
   onMouseUp (e) {
@@ -491,6 +579,12 @@ class ViewportEditor extends React.Component {
       });
     }
   }
+  onMouseLeave () {
+    this.setState({
+      down: null,
+      hover: null
+    });
+  }
   render () {
     const {
       width,
@@ -500,7 +594,8 @@ class ViewportEditor extends React.Component {
       alterDraw
     } = this.props;
     const {
-      down
+      down,
+      hover
     } = this.state;
     const style = {
       position: "relative",
@@ -511,7 +606,8 @@ class ViewportEditor extends React.Component {
     const mouseEvents = {
       onMouseDown: this.onMouseDown,
       onMouseUp: this.onMouseUp,
-      onMouseMove: this.onMouseMove
+      onMouseMove: this.onMouseMove,
+      onMouseLeave: this.onMouseLeave
     };
 
     const contentStyle = {
@@ -534,7 +630,8 @@ class ViewportEditor extends React.Component {
       let bound = core.computeBound(slide2d, object, styles);
       const P = core.Position(slide2d, data);
       const scale = P.getScale();
-      if (shapeOperation(object) === Shapes.TEXT) {
+      switch (shapeOperation(object)) {
+        case Shapes.TEXT:
         // Text should disappear when edited
         renderDraws.splice(edit, 1);
 
@@ -543,12 +640,18 @@ class ViewportEditor extends React.Component {
           onChange={alterDraw.bind(null, edit)}
           bound={P.applyBound(bound)}
           scale={scale}
-          canvasStyles={styles} />;
+          styles={styles} />;
+        break;
+
+        case Shapes.RECT:
+        content = <RectEditor
+          value={object}
+          styles={styles} />;
       }
     }
 
     if (down && down.target !== -1 && (!down.isTextArea || down.hasLeavedTextArea)) {
-      const {target} = down;
+      let {target} = down;
       let bound = core.computeBound(slide2d, data.draws[target], core.getCanvasStyles(data, target));
       renderDraws.push({
         fillStyle: "rgba(255,0,0,0.2)",
@@ -557,6 +660,20 @@ class ViewportEditor extends React.Component {
       });
       renderDraws.push([ "fillRect" ].concat(bound));
       renderDraws.push([ "strokeRect" ].concat(bound));
+    }
+
+    if (hover && hover.target !== -1 && (edit === -1 || edit !== hover.target)) {
+      let {target} = hover;
+      let bound = core.computeBound(slide2d, data.draws[target], core.getCanvasStyles(data, target));
+      renderDraws.push({
+        fillStyle: "transparent",
+        strokeStyle: "rgba(255,0,0,1)",
+        lineWidth: 1
+      });
+      renderDraws.push([ "fillRect" ].concat(bound));
+      renderDraws.push([ "strokeRect" ].concat(bound));
+
+      style.cursor = "pointer";
     }
 
     return <div {...mouseEvents} style={style}>
@@ -617,18 +734,11 @@ export default class Slide2dEditor extends React.Component {
     copy.draws = clone(copy.draws);
     const target = copy.draws[index] = clone(copy.draws[index]);
     if (shapeOperation(target) === Shapes.TEXT) {
-      target[4] = deserializeFont(styles.font).size;
+      target[4] = core.deserializeFont(styles.font).size;
     }
 
-    // Keep the styles that are new in the context
-    const stylesContext = core.getCanvasStyles(copy, index-1);
-    const newStyles = {};
-    for (let k in styles) {
-      if (stylesContext[k] !== styles[k]) {
-        newStyles[k] = styles[k];
-      }
-    }
-    copy.draws[index-1] = newStyles;
+    copy.draws[index-1] = styles;
+    core.simplifyStylesAt(copy, index-1);
 
     onChange(copy);
   }
@@ -663,7 +773,8 @@ export default class Slide2dEditor extends React.Component {
         data={value}
         createItem={this.createItem}
         alterStyle={this.alterStyle}
-        alterData={this.alterData} />
+        alterData={this.alterData}
+        alterDraw={this.alterDraw} />
       <ViewportEditor
         {...state}
         width={width}

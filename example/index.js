@@ -3,10 +3,10 @@ var Slide2dEditor = require("..");
 
 const initialValue = {
   "background": "#ddd",
-  "size": [ 800, 400 ],
+  "size": [ 600, 400 ],
   "draws": [
     { fillStyle: "#000", font: "bold 40px monospace", textBaseline: "top", textAlign: "start" },
-    ["fillText", "Hello World", 400, 100, 40]
+    ["fillText", "Hello World", 100, 100, 40]
   ]
 };
 
@@ -33,19 +33,15 @@ class App extends React.Component {
   render () {
     const { value } = this.state;
     return <div>
-      <div>
       <Slide2dEditor
-        width={800}
+        width={600}
         height={440}
         value={value}
         onChange={this.onChange} />
-      </div>
-      <div>
       <textarea
-        style={{ width: "800px", height: "400px", fontFamily: "monospace" }}
+        style={{ width: "300px", height: "434px", fontFamily: "monospace" }}
         onChange={this.onEdit}
         value={JSON.stringify(value, null, 2)} />
-      </div>
     </div>;
   }
 }

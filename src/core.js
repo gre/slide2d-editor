@@ -1,19 +1,69 @@
+//import slide2d from "slide2d";
 import objectAssign from "object-assign";
 import clone from "lodash/lang/clone";
+//import cloneDeep from "lodash/lang/cloneDeep";
 import * as vec2 from "./vec2";
 
-export function translateDraw (draw, v) {
-  const copy = clone(draw);
-  switch (draw[0]) {
-    case "fillText":
-    case "strokeText":
-    copy[2] += v[0];
-    copy[3] += v[1];
-    break;
-    // TODO other shapes
-  }
-  return copy;
+
+export function serializeFont (style) {
+  const {
+    bold,
+    italic,
+    size,
+    family
+  } = style;
+  let font = [
+    bold ? "bold" : "",
+    italic ? "italic" : "",
+    (size || 12)+"px",
+    family || "serif"
+  ].filter(function (v) {
+    return v;
+  }).join(" ");
+  return font;
 }
+
+export function deserializeFont (font) {
+  const span = document.createElement("span");
+  span.style.font = font;
+  const {
+    fontWeight,
+    fontStyle,
+    fontSize,
+    fontFamily
+  } = span.style;
+  const extract = fontSize.match(/([0-9]+)px/);
+  return {
+    bold: fontWeight==="bold",
+    italic: fontStyle==="italic",
+    size: extract && parseInt(extract[1], 10) || 12,
+    family: fontFamily
+  };
+}
+
+export function simplifyStylesAt (data, index) {
+  const stylesContext = getCanvasStyles(data, index);
+  const styles = data.draws[index];
+  const newStyles = {};
+  for (let k in styles) {
+    if (stylesContext[k] !== styles[k]) {
+      newStyles[k] = styles[k];
+    }
+  }
+  data.draws[index] = newStyles;
+}
+
+/*
+export function normalizeData (data) {
+  const obj = objectAssign({}, slide2d.defaults, cloneDeep(data));
+  obj.draws.forEach(function (draw, i) {
+    if (!(draw instanceof Array)) {
+      simplifyStylesAt(obj, i);
+    }
+  });
+  return obj;
+}
+*/
 
 const initialCanvasStyles = (() => {
   const canvas = document.createElement("canvas");
@@ -42,7 +92,7 @@ export function getCanvasStyles (data, index) {
 }
 
 export function estimateTextHeight (ctx) {
-  return ctx.measureText(" ").width;
+  return ctx.measureText("–").width;
 }
 
 export function boundStyle (bound) {
@@ -90,6 +140,12 @@ export function computeBound (slide2d, draw, accumulatedStyles) {
   }
   let bound = null;
   switch (draw[0]) {
+    case "rect":
+    case "fillRect":
+    case "strokeRect":
+    bound = draw.slice(1);
+    break;
+
     case "fillText":
     case "strokeText":
       const [, text, x, y, lineHeight] = draw;
@@ -112,6 +168,25 @@ export function computeBound (slide2d, draw, accumulatedStyles) {
   }
   ctx.restore();
   return bound;
+}
+
+export function translateDraw (draw, v) {
+  const copy = clone(draw);
+  switch (draw[0]) {
+    case "fillText":
+    case "strokeText":
+    copy[2] += v[0];
+    copy[3] += v[1];
+    break;
+    case "rect":
+    case "fillRect":
+    case "strokeRect":
+    copy[1] += v[0];
+    copy[2] += v[1];
+
+    // TODO other shapes
+  }
+  return copy;
 }
 
 export function findItemByPosition (slide2d, data, pos) {
