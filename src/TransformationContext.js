@@ -40,6 +40,10 @@ export default class TransformationContext {
   transformPair () {
     return this.t.transformPair.apply(this.t, arguments);
   }
+  getTransform () {
+    const { m00, m10, m01, m11, v0, v1 } = this.t;
+    return [ m00, m10, m01, m11, v0, v1 ];
+  }
 
   // Mocks context2d API
   save () {
@@ -47,6 +51,9 @@ export default class TransformationContext {
   }
   restore () {
     this.t = this.stack.pop();
+  }
+  rotate () {
+    this.t.rotate.apply(this.t, arguments);
   }
   scale () {
     this.t.scale.apply(this.t, arguments);

@@ -533,20 +533,21 @@ class TextEditor extends React.Component {
     const {
       value,
       styles,
-      bound
+      bound,
+      matrix
     } = this.props;
     const style = objectAssign(
       this.fromCanvasStyles(styles, value[4]), {
         padding: 0,
         border: "none",
-        outline: "1px solid red",
+        outline: "none",
         background: "transparent",
         position: "absolute",
-        top: 0,
-        left: 0,
+        left: bound[0],
+        top: bound[1],
         width: Math.max(10, Math.round(bound[2]))+"px",
         height: Math.round(bound[3])+"px",
-        transform: "translate("+bound[0]+"px,"+bound[1]+"px)",
+        transform: "matrix("+matrix+")",
         overflow: "hidden",
         resize: "none"
     });
@@ -680,6 +681,12 @@ class ViewportEditor extends React.Component {
       height: style.height
     };
 
+    const overlayStyle = {
+      position: "absolute",
+      top: 0,
+      left: 0,
+    };
+
     const renderData = clone(data);
     const renderDraws = renderData.draws = clone(renderData.draws);
 
@@ -693,11 +700,15 @@ class ViewportEditor extends React.Component {
         case Shapes.TEXT:
         // Text should disappear when edited
         renderDraws.splice(edit, 1);
+        objectAssign(overlayStyle, core.boundStyle(m.bound), {
+          outline: "1px solid #f00"
+        });
 
         content = <TextEditor
           value={object}
           onChange={alterDraw.bind(null, edit)}
           bound={m.bound}
+          matrix={m.matrix}
           styles={m.styles} />;
         break;
 
@@ -711,31 +722,24 @@ class ViewportEditor extends React.Component {
     if (down && down.target !== -1 && (!down.isTextArea || down.hasLeavedTextArea)) {
       let {target} = down;
       let { bound } = meta.getMeta([ target ]);
-      renderDraws.push({
-        fillStyle: "rgba(255,0,0,0.2)",
-        strokeStyle: "rgba(255,0,0,1)",
-        lineWidth: 1
+      objectAssign(overlayStyle, core.boundStyle(bound), {
+        background: "rgba(255,0,0,0.2)",
+        border: "1px solid rgba(255,0,0,1)"
       });
-      renderDraws.push([ "fillRect" ].concat(bound));
-      renderDraws.push([ "strokeRect" ].concat(bound));
     }
 
     if (hover && hover.target !== -1 && (edit === -1 || edit !== hover.target)) {
       let {target} = hover;
       let { bound } = meta.getMeta([ target ]);
-      renderDraws.push({
-        fillStyle: "transparent",
-        strokeStyle: "rgba(255,0,0,1)",
-        lineWidth: 1
+      objectAssign(overlayStyle, core.boundStyle(bound), {
+        border: "1px solid rgba(255,0,0,1)"
       });
-      renderDraws.push([ "fillRect" ].concat(bound));
-      renderDraws.push([ "strokeRect" ].concat(bound));
-
       style.cursor = "pointer";
     }
 
     return <div {...mouseEvents} style={style}>
       <Viewport width={width} height={height} data={renderData} />
+      <div style={overlayStyle}></div>
       <div style={contentStyle}>
         {content}
       </div>

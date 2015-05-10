@@ -73,40 +73,13 @@ function transformBound (ctx, bound) {
   return [ x, y, x2-x, y2-y ];
 }
 
-function storeInPathTree (tree, path, value) {
-  if (path.length === 0) throw new Error("no path");
-  const head = path[0];
-  if (path.length === 1) {
-    tree[head] = value;
-  }
-  else {
-    if (!tree[head]) tree[head] = [];
-    storeInPathTree(tree[head], path.slice(1), value);
-  }
+function serializePath (path) {
+  return path.join(",");
 }
-
-function getPathTree (tree, path) {
-  if (path.length === 0) return tree;
-  return getPathTree(tree[path[0]], path.slice(1));
-}
-
-function findPathRec (tree, f, path) {
-  if (tree instanceof Array) {
-    for (let i=0; i<tree.length; ++i) {
-      let res = findPathRec(tree[i], f, path.concat([ i ]));
-      if (res) return res;
-    }
-  }
-  else {
-    let res = f(tree, path);
-    if (res) return res;
-  }
-  return null;
-}
-
-// depth first search
-function findPath (tree, f) {
-  return findPathRec(tree, f, []);
+function deserializePath (hash) {
+  return hash.split(",").map(function (s) {
+    return parseInt(s, 10);
+  });
 }
 
 export default class Slide2dMeta {
@@ -116,41 +89,49 @@ export default class Slide2dMeta {
     this.height = height;
     this.data = data;
     const ctx = new TransformationContext(width, height);
-    const metaTree = [];
+    const metas = {};
     Slide2d(ctx).render(data, function (path, draw) {
-      if ((draw instanceof Array) && typeof draw[0] === "string") {
-        // post draw op
-        const canvasBound = computeBound(ctx, draw);
-        const bound = canvasBound && transformBound(ctx, canvasBound);
-
-        const styles = {};
-        for (var k in ctx) {
-          if (k.indexOf("webkit") !== -1) continue;
-          const typ = typeof ctx[k];
-          if (typ !== "function" && typ !== "object") {
-            styles[k] = ctx[k];
-          }
+      let canvasBound, bound, styles, matrix = ctx.getTransform();
+      styles = {};
+      for (var k in ctx) {
+        if (k.indexOf("webkit") !== -1) continue;
+        const typ = typeof ctx[k];
+        if (typ !== "function" && typ !== "object") {
+          styles[k] = ctx[k];
         }
-
-        storeInPathTree(metaTree, path, {
-          canvasBound,
-          bound,
-          styles
-        });
       }
+
+      if (draw instanceof Array) {
+        if (typeof draw[0] === "string") {
+          canvasBound = computeBound(ctx, draw);
+          bound = canvasBound && transformBound(ctx, canvasBound);
+        }
+        else {
+          // TODO: union of bounds
+        }
+      }
+
+      metas[serializePath(path)] = {
+        canvasBound,
+        bound,
+        styles,
+        matrix
+      };
     });
-    this.tree = metaTree;
+    this.metas = metas;
   }
 
   getMeta (path) {
-    return getPathTree(this.tree, path);
+    return this.metas[serializePath(path)];
   }
 
   findByPosition (pos) {
-    return findPath(this.tree, function (item, path) {
-      if (item && item.bound && vec2.inBound(pos, item.bound)) {
-        return path;
-      }
-    });
+    const metas = this.metas;
+    for (let k in metas) {
+      let meta = metas[k];
+      if (meta && meta.bound && vec2.inBound(pos, meta.bound))
+        return deserializePath(k);
+    }
+    return null;
   }
 }

@@ -5,6 +5,11 @@ const initialValue = {
   "background": "#ddd",
   "size": [ 600, 400 ],
   "draws": [
+  /*
+    [ "translate", 40, 10 ],
+    [ "scale", 0.6, 1.0 ],
+    [ "rotate", 0.1 ],
+    */
     { fillStyle: "#000", font: "bold 40px monospace", textBaseline: "top", textAlign: "start" },
     ["fillText", "Hello World", 100, 100, 40]
   ]
