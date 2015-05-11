@@ -534,7 +534,10 @@ class TextEditor extends React.Component {
       value,
       styles,
       bound,
-      matrix
+      matrix,
+      width,
+      height,
+      position
     } = this.props;
     const style = objectAssign(
       this.fromCanvasStyles(styles, value[4]), {
@@ -543,11 +546,11 @@ class TextEditor extends React.Component {
         outline: "none",
         background: "transparent",
         position: "absolute",
-        left: bound[0],
-        top: bound[1],
-        width: Math.max(10, Math.round(bound[2]))+"px",
-        height: Math.round(bound[3])+"px",
-        transform: "matrix("+matrix+")",
+        left: position[0]+"px",
+        top: position[1]+"px",
+        width: width+"px",
+        height: height+"px",
+        transform: `matrix(${matrix})`,
         overflow: "hidden",
         resize: "none"
     });
@@ -707,7 +710,12 @@ class ViewportEditor extends React.Component {
         content = <TextEditor
           value={object}
           onChange={alterDraw.bind(null, edit)}
-          bound={m.bound}
+          position={[
+            m.bound[0],
+            m.bound[1]
+          ]}
+          width={Math.max(10, Math.round(m.canvasBound[2]))}
+          height={Math.round(m.canvasBound[3])}
           matrix={m.matrix}
           styles={m.styles} />;
         break;

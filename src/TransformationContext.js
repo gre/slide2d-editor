@@ -1,8 +1,21 @@
+import objectAssign from "object-assign";
 import { affine } from "affine";
-import { methods as context2dMethods } from "./context2d";
+
+const preserveMethods = [ "measureText" ];
 
 function createAffineFromCanvasParams (m00, m10, m01, m11, v0, v1) {
   return new affine.affine2d([ m00, m01, m10, m11, v0, v1 ]);
+}
+
+function wrap (obj, methods) {
+  Object.keys(methods).map(k => {
+    let old = obj[k];
+    let method = methods[k];
+    obj[k] = function () {
+      old.apply(this, arguments);
+      method.apply(this, arguments);
+    };
+  });
 }
 
 /**
@@ -11,60 +24,84 @@ function createAffineFromCanvasParams (m00, m10, m01, m11, v0, v1) {
  * while being able to pass a TransformationContext in slide2d lib
  */
 export default class TransformationContext {
+
   constructor (width, height) {
-    this.t = new affine.affine2d();
-    this.stack = [];
-    for (var k in context2dMethods) {
-      if (!this[k]) {
-        this[k] = function(){};
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    let t = new affine.affine2d(); // current transformation
+    const stack = []; // stack of save()d transformations
+
+    // Implementing noop methods for all unwrapped
+    const keys = [];
+    for (let k in ctx) keys.push(k);
+    keys.map(k => {
+      if (k.indexOf("webkit")!==-1) return;
+      let prop = ctx[k];
+      switch (typeof prop) {
+        case "function":
+        if (!this[k]) this[k] =
+          preserveMethods.indexOf(k)===-1 ?
+          function(){} : prop.bind(ctx);
+        break;
+
+        case "object":
+        this[k] = ctx[k];
+        break;
+
+        default:
+        Object.defineProperty(this, k, {
+          enumerable: true,
+          get () {
+            return ctx[k];
+          },
+          set (value) {
+            ctx[k] = value;
+          }
+        });
       }
-    }
-    this.canvas = {
-      width: width,
-      height: height
-    };
+    });
 
-    this.realContext = document.createElement("canvas").getContext("2d");
+    // Wrap transformation methods
+    wrap(this, {
+      save () {
+        stack.push(t.copy());
+      },
+      restore () {
+        t = stack.pop();
+      },
+      rotate () {
+        t.rotate.apply(t, arguments);
+      },
+      scale () {
+        t.scale.apply(t, arguments);
+      },
+      translate () {
+        t.translate.apply(t, arguments);
+      },
+      transform () {
+        t.rightComposeWith(createAffineFromCanvasParams.apply(null, arguments));
+      },
+      setTransform () {
+        t = createAffineFromCanvasParams.apply(null, arguments);
+      }
+    });
+
+    // Mocks context2d API
+    objectAssign(this, {
+      // Special methods
+      transformVec () {
+        t.transformVec.apply(t, arguments);
+      },
+      transformPair () {
+        return t.transformPair.apply(t, arguments);
+      },
+      getTransform () {
+        const { m00, m10, m01, m11, v0, v1 } = t;
+        return [ m00, m10, m01, m11, v0, v1 ];
+      }
+    });
   }
 
-  // Expose real canvas2d implementation
-  measureText () {
-    this.realContext.font = this.font;
-    return this.realContext.measureText.apply(this.realContext, arguments);
-  }
-
-  // Exposes the affine API
-  transformVec () {
-    this.t.transformVec.apply(this.t, arguments);
-  }
-  transformPair () {
-    return this.t.transformPair.apply(this.t, arguments);
-  }
-  getTransform () {
-    const { m00, m10, m01, m11, v0, v1 } = this.t;
-    return [ m00, m10, m01, m11, v0, v1 ];
-  }
-
-  // Mocks context2d API
-  save () {
-    this.stack.push(this.t.copy());
-  }
-  restore () {
-    this.t = this.stack.pop();
-  }
-  rotate () {
-    this.t.rotate.apply(this.t, arguments);
-  }
-  scale () {
-    this.t.scale.apply(this.t, arguments);
-  }
-  translate () {
-    this.t.translate.apply(this.t, arguments);
-  }
-  transform () {
-    this.t.rightComposeWith(createAffineFromCanvasParams.apply(null, arguments));
-  }
-  setTransform () {
-    this.t = createAffineFromCanvasParams.apply(null, arguments);
-  }
 }
